@@ -1,6 +1,13 @@
-const board = document.getElementById('board');
-const cells = document.querySelectorAll('.square');
-const winningConditions = [
+const cells = document.querySelectorAll('[data-cell]');
+const board = document.getElementById('game-board');
+const resetButton = document.getElementById('reset-button');
+const menu = document.getElementById('menu');
+const playerVsPlayerButton = document.getElementById('player-vs-player');
+const playerVsAiButton = document.getElementById('player-vs-ai');
+const messageElement = document.getElementById('message');
+let isCircleTurn = false;
+let isPlayerVsAI = false;
+const WINNING_COMBINATIONS = [
     [0, 1, 2],
     [3, 4, 5],
     [6, 7, 8],
@@ -8,63 +15,107 @@ const winningConditions = [
     [1, 4, 7],
     [2, 5, 8],
     [0, 4, 8],
-    [2, 4, 6],
+    [2, 4, 6]
 ];
-let currentPlayer = 'X'; // AI will overwrite this on first turn
-let gameState = ['', '', '', '', '', '', '', '', ''];
 
-function makeMove(cellIndex, player) {
-  if (gameState[cellIndex] !== '') {
-    return; // Cell already occupied
-  }
-  gameState[cellIndex] = player;
-  cells[cellIndex].textContent = player;
-}
-
-function checkWin() {
-  for (let condition of winningConditions) {
-    const [a, b, c] = condition;
-    if (gameState[a] === currentPlayer && gameState[b] === currentPlayer && gameState[c] === currentPlayer) {
-      return true;
+const handleClick = (e) => {
+    const cell = e.target;
+    const currentClass = isCircleTurn ? 'circle' : 'x';
+    placeMark(cell, currentClass);
+    if (checkWin(currentClass)) {
+        endGame(false);
+    } else if (isDraw()) {
+        endGame(true);
+    } else {
+        swapTurns();
+        if (isPlayerVsAI && !isCircleTurn) {
+            setTimeout(aiMove, 500); // AI makes a move after a short delay
+        }
     }
-  }
-  return false;
-}
+};
 
-function isDraw() {
-  return gameState.every(cell => cell !== '');
-}
+const placeMark = (cell, currentClass) => {
+    cell.classList.add(currentClass);
+};
 
-function handleCellClick(event) {
-  const cellIndex = parseInt(event.target.dataset.cell);
-  makeMove(cellIndex, currentPlayer);
-  if (checkWin()) {
-    alert(`${currentPlayer} wins!`);
-    return;
-  }
-  if (isDraw()) {
-    alert('Draw!');
-    return;
-  }
-  currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-  makeAIMove();
-}
+const swapTurns = () => {
+    isCircleTurn = !isCircleTurn;
+};
 
-function makeAIMove() {
-  // Simplified AI (random move) for demonstration
-  let emptyCells = [];
-  for (let i = 0; i < gameState.length; i++) {
-    if (gameState[i] === '') {
-      emptyCells.push(i);
+const checkWin = (currentClass) => {
+    return WINNING_COMBINATIONS.some(combination => {
+        return combination.every(index => {
+            return cells[index].classList.contains(currentClass);
+        });
+    });
+};
+
+const isDraw = () => {
+    return [...cells].every(cell => {
+        return cell.classList.contains('x') || cell.classList.contains('circle');
+    });
+};
+
+const endGame = (draw) => {
+    if (draw) {
+        messageElement.textContent = 'It\'s a Draw!';
+    } else {
+        messageElement.textContent = `${isCircleTurn ? "O's" : "X's"} Wins! Congratulations!`;
     }
-  }
-  const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-  makeMove(randomCell, 'O');
-  currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-}
+    messageElement.classList.remove('hidden');
+    resetButton.classList.remove('hidden');
+};
 
-cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+const resetGame = () => {
+    cells.forEach(cell => {
+        cell.classList.remove('x');
+        cell.classList.remove('circle');
+        cell.removeEventListener('click', handleClick);
+        cell.addEventListener('click', handleClick, { once: true });
+    });
+    isCircleTurn = false;
+    messageElement.classList.add('hidden');
+    if (isPlayerVsAI) {
+        setTimeout(aiMove, 500); // AI makes the first move after a short delay
+    }
+};
 
-// Make AI move on game start (ensures AI goes first)
-makeAIMove();
+const aiMove = () => {
+    const availableCells = [...cells].filter(cell => !cell.classList.contains('x') && !cell.classList.contains('circle'));
+    if (availableCells.length === 0) return;
+    const randomCell = availableCells[Math.floor(Math.random() * availableCells.length)];
+    placeMark(randomCell, 'x');
+    if (checkWin('x')) {
+        endGame(false);
+    } else if (isDraw()) {
+        endGame(true);
+    } else {
+        swapTurns();
+    }
+};
+
+playerVsPlayerButton.addEventListener('click', () => {
+    isPlayerVsAI = false;
+    menu.classList.add('hidden');
+    board.classList.remove('hidden');
+    resetButton.classList.remove('hidden');
+    resetGame();
+});
+
+playerVsAiButton.addEventListener('click', () => {
+    isPlayerVsAI = true;
+    menu.classList.add('hidden');
+    board.classList.remove('hidden');
+    resetButton.classList.remove('hidden');
+    resetGame();
+});
+
+resetButton.addEventListener('click', resetGame);
+
+cells.forEach(cell => {
+    cell.addEventListener('click', handleClick, { once: true });
+});
+
+// AI makes the first move when the game starts
+setTimeout(aiMove, 500);
 
